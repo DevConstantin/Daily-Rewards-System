@@ -1,0 +1,41 @@
+{
+  "name": "Sleeping System",
+  "tree": {
+    "$className": "DataModel",
+    "$ignoreUnknownInstances": true,
+
+     "Workspace": {
+      "$ignoreUnknownInstances": true,
+      "$className": "Workspace",
+      "$path": "src/Workspace"
+    },
+
+    "ReplicatedStorage": {
+      "$ignoreUnknownInstances": true,
+      "$className": "ReplicatedStorage",
+      "$path": "src/ReplicatedStorage"
+    },
+
+    "ServerScriptService": {
+      "$ignoreUnknownInstances": true,
+      "$className": "ServerScriptService",
+      "$path": "src/ServerScriptService"
+    },
+
+    "StarterGui": {
+      "$ignoreUnknownInstances": true,
+      "$className": "StarterGui",
+      "$path": "src/StarterGui"
+    },
+
+    "StarterPlayer": {
+      "$ignoreUnknownInstances": true,
+      "$className": "StarterPlayer",
+      "StarterPlayerScripts": {
+        "$ignoreUnknownInstances": true,
+        "$className": "StarterPlayerScripts",
+        "$path": "src/StarterPlayerScripts"
+      }
+    }  
+  }
+}
