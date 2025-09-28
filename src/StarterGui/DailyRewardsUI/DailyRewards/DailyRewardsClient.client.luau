@@ -1,13 +1,15 @@
 
 --- // SERVICES
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TweenService = game:GetService("TweenService")
 
 --- // OBJECTS
 local rewardsDb = require(ReplicatedStorage.DB.DailyRewardsDB)
 
 -- Daily rewards UI
 local rewardsGUI = script.Parent
-local rewardFrame = rewardsGUI.Main.RewardFrame
+local mainFrame = rewardsGUI.Main
+local rewardFrame = mainFrame.RewardFrame
 local rewardButtonTemplate = script.Parent.RewardButton
 local templateImages = rewardButtonTemplate.Images
 
@@ -35,12 +37,19 @@ local galleonsImageId = imageIds:GetAttribute("Galleons")
 local chestsImageId   = imageIds:GetAttribute("EnchantedChests")
 local UPDATE_ZINDEX   = false
 local IMAGE_COLOR     = Color3.fromRGB(255, 186, 47)
+local REWARD_CLAIMED_DELAY = 0.7 -- How long will the UI remains visible after a reward has been claimed
 
 --- // VARIABLES
 local currentStreak = nil
 local currentSeason = nil
 local rewardAvailable = nil
 local nextRewardReset = math.floor(21.3 * 60 * 60)
+
+local originalPos = mainFrame.Position
+local hiddenPos = originalPos + UDim2.fromScale(0, 2)
+
+local showRewardsTween = TweenService:Create(mainFrame, TweenInfo.new(1, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Position = originalPos})
+local hideRewardsTween = TweenService:Create(mainFrame, TweenInfo.new(1, Enum.EasingStyle.Back, Enum.EasingDirection.In), {Position = hiddenPos})
 
 -- // Typical reward DB setup: 
 --local dailyRewards = {
@@ -104,6 +113,17 @@ function formatDailyRewardTitleText(rewardData)
 	return table.concat(parts, " + ")
 end
 
+local function hideMainFrame(instant: boolean, noSound: boolean)
+	if not instant then 
+		hideRewardsTween:Play()
+		if not (noSound or confirmSound.IsPlaying) then
+			confirmSound:Play()
+		end
+	else 
+		mainFrame.Position = hiddenPos
+	end
+end
+
 -- Can be set up later so certain buttons are pre-created. For instance, if we are rewarding a pet on day 7
 local function isValidSetupDay(rewardDay)
 	return true -- rewardDay < 7
@@ -155,7 +175,8 @@ local function showNextRewardTime(claimTextLabel)
 			claimTextLabel.Text = formatTime(i, true)
 
 			if i <= 0 then
-				rewardsGUI.Enabled = false 
+				hideMainFrame(true)
+				--rewardsGUI.Enabled = false 
 				break 
 			end
 
@@ -168,7 +189,8 @@ end
 local function initialize()
 	if not rewardAvailable then 
 		print("DailyRewardsUI: A reward is not currently available. Daily rewards UI closed.") 
-		rewardsGUI.Enabled = false 
+		hideMainFrame(true)
+		--rewardsGUI.Enabled = false 
 		return 
 	end 
 	
@@ -216,7 +238,7 @@ local function initialize()
 		setupButtonImages(rewardButton, rewards)
 		rewardButton.Visible = true 
 
-		rewardButton.MouseButton1Click:Connect(function()
+		local function rewardButtonClicked()
 			if not rewardAvailable then 
 				warn("You cannot request a reward for day", rewardDay, "A reward is not currently available.") 
 				return 
@@ -224,18 +246,32 @@ local function initialize()
 			
 			if rewardDay == currentStreak + 1 then -- If our streak is 0, we are rewarded with day '1' reward
 				rewardClaimedSound:Play() 
-				rewardEvent:FireServer()
+				rewardButton.ClaimText.Text = "Claimed" -- Update the button to indicate that this day's reward has been claimed
+				rewardButton.Checkmark.Visible = true
+				--rewardEvent:FireServer()
+				
+				task.delay(REWARD_CLAIMED_DELAY, function()
+					if mainFrame.Position == originalPos then 
+						hideMainFrame(false, true)
+					end
+				end)		
 			else 
 				warn("You cannot request a reward for day", rewardDay, "Current streak:", currentStreak)
 			end 
-		end)
+		end
 
+		rewardButton.MouseButton1Click:Connect(rewardButtonClicked)
 		rewardButton.Parent = rewardFrame
 	end
 	
-	if not rewardsGUI.Enabled then 
-		rewardsGUI.Enabled = true 
-	end 	
+
+	if mainFrame.Position ~= originalPos then 
+		showRewardsTween:Play()
+	end
+
+	-- if not rewardsGUI.Enabled then 
+	-- 	rewardsGUI.Enabled = true 
+	-- end 	
 end
 
 local function updateUIClientEvent(_currentStreak, _rewardAvailable, _nextRewardReset)
@@ -249,6 +285,8 @@ local function updateUIClientEvent(_currentStreak, _rewardAvailable, _nextReward
 end
 
 --- // MAIN
+hideMainFrame(true, true)
+rewardsGUI.Enabled = true
 
 if IMAGE_COLOR then   
     for _, imageLabel in ipairs(templateImages:GetChildren()) do  
@@ -274,7 +312,22 @@ requestData.OnClientEvent:Connect(updateUIClientEvent)
 
 script.Parent.Main.CloseButton.MouseButton1Click:Connect(function()
 	confirmSound:Play()
-	rewardsGUI.Enabled = false
+	hideMainFrame(false)
+	--rewardsGUI.Enabled = false
+end)
+
+-- This allows other scripts to easily toggle visibility of the reward frame
+local ignoreAttribute = false
+rewardsGUI:GetAttributeChangedSignal("RewardsVisible"):Connect(function()
+	if rewardsGUI:GetAttribute("RewardsVisible") then 
+		showRewardsTween:Play()
+		ignoreAttribute = true 
+		rewardsGUI:SetAttribute("RewardsVisible", false) -- Instantly set it to false, so this functionality can be used once again
+		task.wait(0.5)
+		ignoreAttribute = false 
+	elseif not ignoreAttribute and not rewardsGUI:GetAttribute("RewardsVisible") then 
+		hideMainFrame(false)
+	end
 end)
 
 rewardsGUI:GetPropertyChangedSignal("Enabled"):Connect(function()

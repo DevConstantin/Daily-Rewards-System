@@ -1,5 +1,5 @@
 {
-  "name": "Sleeping System",
+  "name": "Daily Rewards",
   "tree": {
     "$className": "DataModel",
     "$ignoreUnknownInstances": true,
