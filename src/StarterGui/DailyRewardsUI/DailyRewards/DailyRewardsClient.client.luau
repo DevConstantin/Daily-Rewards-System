@@ -1,4 +1,3 @@
-
 --- // SERVICES
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
@@ -12,6 +11,7 @@ local mainFrame = rewardsGUI.Main
 local rewardFrame = mainFrame.RewardFrame
 local rewardButtonTemplate = script.Parent.RewardButton
 local templateImages = rewardButtonTemplate.Images
+local nextRewardHint = mainFrame.NextRewardsHint
 
 -- Main menu elements, to ensure the daily rewards UI doesn't open while we're in the main menu
 local mainMenu = script.Parent.Parent.Parent:FindFirstChild("MainMenu")
@@ -21,10 +21,10 @@ local enterGame = mainMenuButtons and mainMenuButtons:FindFirstChild("EnterGame"
 
 -- Events
 local rewardEvents = ReplicatedStorage:WaitForChild("RemoteEvents"):WaitForChild("DailyRewardEvents")
-local rewardEvent  = rewardEvents:WaitForChild("DailyRewardEvent")
-local requestData  = rewardEvents:WaitForChild("RequestRewardData")
+local rewardEvent = rewardEvents:WaitForChild("DailyRewardEvent")
+local requestData = rewardEvents:WaitForChild("RequestRewardData")
 
--- Sounds 
+-- Sounds
 local uiSounds = game:GetService("SoundService"):WaitForChild("UI_Sounds")
 local clickSound = uiSounds:WaitForChild("RBLX UI Hover 02 (SFX)")
 local enter_DC_Sound = uiSounds:WaitForChild("RBLX UI Hover 03 (SFX)")
@@ -34,9 +34,9 @@ local rewardClaimedSound = uiSounds:WaitForChild("Audio/凹凸世界-v_ui_comm_a
 --- // CONFIG
 local imageIds = ReplicatedStorage:WaitForChild("Configurations"):WaitForChild("ImageIds")
 local galleonsImageId = imageIds:GetAttribute("Galleons")
-local chestsImageId   = imageIds:GetAttribute("EnchantedChests")
-local UPDATE_ZINDEX   = false
-local IMAGE_COLOR     = Color3.fromRGB(255, 186, 47)
+local chestsImageId = imageIds:GetAttribute("EnchantedChests")
+local UPDATE_ZINDEX = false
+local IMAGE_COLOR = Color3.fromRGB(255, 186, 47)
 local REWARD_CLAIMED_DELAY = 0.7 -- How long will the UI remains visible after a reward has been claimed
 
 --- // VARIABLES
@@ -48,10 +48,18 @@ local nextRewardReset = math.floor(21.3 * 60 * 60)
 local originalPos = mainFrame.Position
 local hiddenPos = originalPos + UDim2.fromScale(0, 2)
 
-local showRewardsTween = TweenService:Create(mainFrame, TweenInfo.new(1, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Position = originalPos})
-local hideRewardsTween = TweenService:Create(mainFrame, TweenInfo.new(1, Enum.EasingStyle.Back, Enum.EasingDirection.In), {Position = hiddenPos})
+local showRewardsTween = TweenService:Create(
+	mainFrame,
+	TweenInfo.new(1, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+	{ Position = originalPos }
+)
+local hideRewardsTween = TweenService:Create(
+	mainFrame,
+	TweenInfo.new(1, Enum.EasingStyle.Back, Enum.EasingDirection.In),
+	{ Position = hiddenPos }
+)
 
--- // Typical reward DB setup: 
+-- // Typical reward DB setup:
 --local dailyRewards = {
 --	[1] = { galleons = 50  },
 --	[2] = { galleons = 100 },
@@ -62,36 +70,32 @@ local hideRewardsTween = TweenService:Create(mainFrame, TweenInfo.new(1, Enum.Ea
 
 --- // FUNCTIONS
 
--- Function to convert seconds to minutes or hours 
+-- Function to convert seconds to minutes or hours
 -- @param noSeconds: Will not show seconds while hours are present, to shorten the string
-local function formatTime(seconds, noSeconds : boolean)
+local function formatTime(seconds, noSeconds: boolean)
 	local parts = {}
 
 	-- Calculate hours
 	local hours = math.floor(seconds / 3600)
 	if hours > 0 then
-		table.insert(parts,
-			hours .. (hours == 1 and " hour" or " hours")
-		)
+		table.insert(parts, hours .. (hours == 1 and " hour" or " hours"))
 	end
 
 	-- Calculate remaining minutes
 	local minutes = math.floor((seconds % 3600) / 60)
 	if minutes > 0 then
-		table.insert(parts,
-			minutes .. (minutes == 1 and " minute" or " minutes")
-		)
+		table.insert(parts, minutes .. (minutes == 1 and " minute" or " minutes"))
 	end
 
-	if noSeconds and hours > 0 then return table.concat(parts, ", ") end
+	if noSeconds and hours > 0 then
+		return table.concat(parts, ", ")
+	end
 
 	-- Calculate remaining seconds
 	local secs = seconds % 60
 	if secs > 0 or #parts == 0 then
 		-- always show seconds if nothing else was added
-		table.insert(parts,
-			secs .. (secs == 1 and " second" or " seconds")
-		)
+		table.insert(parts, secs .. (secs == 1 and " second" or " seconds"))
 	end
 
 	-- Join parts with commas
@@ -114,12 +118,12 @@ function formatDailyRewardTitleText(rewardData)
 end
 
 local function hideMainFrame(instant: boolean, noSound: boolean)
-	if not instant then 
+	if not instant then
 		hideRewardsTween:Play()
 		if not (noSound or confirmSound.IsPlaying) then
 			confirmSound:Play()
 		end
-	else 
+	else
 		mainFrame.Position = hiddenPos
 	end
 end
@@ -131,155 +135,176 @@ end
 
 local function setupButtonImages(rewardButton, rewards)
 	local images = rewardButton:FindFirstChild("Images")
-	if not images then 
-		warn("Failed to get images folder within reward button.") 
-		return 
-	end 
-	
-	local chestsCount = rewards.chests 
-	
-	if chestsCount then 
-		for i = 1, chestsCount do 
+	if not images then
+		warn("Failed to get images folder within reward button.")
+		return
+	end
+
+	local chestsCount = rewards.chests
+
+	if chestsCount then
+		for i = 1, chestsCount do
 			local imageLabel = images:FindFirstChild(i)
-			if not imageLabel then 
+			if not imageLabel then
 				warn("Failed to get image level for index", i, "within", images:GetFullName())
-				imageLabel.Visible = false 
-				continue 
-			end 
-				
+				imageLabel.Visible = false
+				continue
+			end
+
 			imageLabel.Image = chestsImageId
-			imageLabel.Visible = true 
+			imageLabel.Visible = true
 		end
 	end
-	
-	if chestsCount == 3 then return end -- No coins need to be shown 
-		
+
+	if chestsCount == 3 then
+		return
+	end -- No coins need to be shown
+
 	local galleonRewards = math.min(math.floor(rewards.galleons / 50), 3) -- How many galleons images should the player see in total? (1-3)
-	-- If we have two enchanted chests being shown, we'll begin at 3 
-	for i = (chestsCount or 0) + 1, galleonRewards do 
+	-- If we have two enchanted chests being shown, we'll begin at 3
+	for i = (chestsCount or 0) + 1, galleonRewards do
 		local imageLabel = images:FindFirstChild(i)
-		if not imageLabel then 
-			warn("Failed to get image level for index", i, "within", images:GetFullName()) 
-			continue 
-		end 
+		if not imageLabel then
+			warn("Failed to get image level for index", i, "within", images:GetFullName())
+			continue
+		end
 		imageLabel.Image = galleonsImageId
-		imageLabel.Visible = true 
+		imageLabel.Visible = true
 	end
 end
 
--- Run the countdown 
-local function showNextRewardTime(claimTextLabel)
+-- Run the countdown
+local function showNextRewardTime(claimTextLabel: TextLabel)
 	task.spawn(function()
-		for i = nextRewardReset, 0, -1 do 
-			--if not dailyRewardsUi.Enabled then break end 
-			claimTextLabel.Text = formatTime(i, true)
+		for i = nextRewardReset, 0, -1 do
+			--if not dailyRewardsUi.Enabled then break end
+			claimTextLabel.Text = (claimTextLabel == nextRewardHint and "Rewards Reset In: " or "") .. formatTime(i, true)
 
 			if i <= 0 then
 				hideMainFrame(true)
-				--rewardsGUI.Enabled = false 
-				break 
+				
+				-- reinitialize the UI
+				if mainFrame.Position == originalPos then
+					requestData:FireServer()
+				end
+				
+				--rewardsGUI.Enabled = false
+				break
 			end
 
 			task.wait(1)
 		end
-	end)	
+	end)
 end
 
 -- Initialize the UI, buttons, etc.
+local firstJoin = true -- This flag makes it so the UI is hidden when the player has no reward and first joins the game. If they initialize function is run a 2nd time, the UI will display
 local function initialize()
-	if not rewardAvailable then 
-		print("DailyRewardsUI: A reward is not currently available. Daily rewards UI closed.") 
+	print("Initializing daily rewards UI. First join?", firstJoin, "Reward available?", rewardAvailable)
+	if firstJoin and not rewardAvailable then
+		print("DailyRewardsUI: A reward is not currently available. Daily rewards UI closed.")
 		hideMainFrame(true)
-		--rewardsGUI.Enabled = false 
-		return 
-	end 
-	
-	for _, button in ipairs(rewardFrame:GetChildren()) do 
-		if button:IsA("TextButton") then 
-			button:Destroy() 
-		end 
+		--rewardsGUI.Enabled = false
+		firstJoin = false 
+		return
 	end
-	
-	local countdownDay = nil 	-- Keep strack of the day on which we'll have a countdown 
-	print("SETTING UP BUTTONS FOR REWARDS:", rewardsDb, "Current reward streak:", currentStreak, "Is a reward available?", rewardAvailable)
-	for rewardDay = 1, #rewardsDb do 
+	firstJoin = false
+
+	for _, button in ipairs(rewardFrame:GetChildren()) do
+		if button:IsA("TextButton") then
+			button:Destroy()
+		end
+	end
+
+	local countdownDay = nil -- Keep strack of the day on which we'll have a countdown
+	print(
+		"SETTING UP BUTTONS FOR REWARDS:",
+		rewardsDb,
+		"Current reward streak:",
+		currentStreak,
+		"Is a reward available?",
+		rewardAvailable
+	)
+
+	showNextRewardTime(nextRewardHint)
+
+	for rewardDay = 1, #rewardsDb do
 		local rewards = rewardsDb[rewardDay]
 		print(" ")
 		print("Setting up reward button for day", rewardDay)
 		print("Day", rewardDay, "reward data:", rewards)
-		
-		local rewardButton = rewardButtonTemplate:Clone() 		
+
+		local rewardButton = rewardButtonTemplate:Clone()
 		rewardButton.DayTitle.Text = formatDailyRewardTitleText(rewards) --"Day " .. rewardDay
-		
+
 		local claimText = nil
 		if not currentStreak then -- Do not display a claim text if the currentStreak is missing
 			claimText = "Day " .. rewardDay
-		elseif rewardDay == countdownDay then 
-			showNextRewardTime(rewardButton.ClaimText) 
+		elseif rewardDay == countdownDay then
+			showNextRewardTime(rewardButton.ClaimText)
 			claimText = ""
 		elseif (rewardDay == #rewardsDb and currentStreak >= rewardDay) or (rewardDay == currentStreak + 1) then -- Reward day index is 3, and our streak is 2, so we can pick up the reward for this day
-			if rewardAvailable then 
+			if rewardAvailable then
 				claimText = "Claim"
 				countdownDay = rewardDay + 1
 				print("Setting countdown day to day", countdownDay)
-			else 
-				showNextRewardTime(rewardButton.ClaimText) 
+			else
+				showNextRewardTime(rewardButton.ClaimText)
 				claimText = ""
 			end
-		elseif rewardDay <= currentStreak then 
+		elseif rewardDay <= currentStreak then
 			claimText = "Claimed"
-		else 
+		else
 			claimText = "Day " .. rewardDay
-		end 
-		
+		end
+
 		print("Countdown day:", countdownDay)
 		rewardButton.ClaimText.Text = claimText
-		rewardButton.Checkmark.Visible = claimText == "Claimed" -- currentStreak check isn't necessary, but it's here for testing purposes 
+		rewardButton.Checkmark.Visible = claimText == "Claimed" -- currentStreak check isn't necessary, but it's here for testing purposes
 		setupButtonImages(rewardButton, rewards)
-		rewardButton.Visible = true 
+		rewardButton.Visible = true
 
 		local function rewardButtonClicked()
-			if not rewardAvailable then 
-				warn("You cannot request a reward for day", rewardDay, "A reward is not currently available.") 
-				return 
+			if not rewardAvailable then
+				warn("You cannot request a reward for day", rewardDay, "A reward is not currently available.")
+				return
 			end
-			
+
 			if rewardDay == currentStreak + 1 then -- If our streak is 0, we are rewarded with day '1' reward
-				rewardClaimedSound:Play() 
+				rewardClaimedSound:Play()
 				rewardButton.ClaimText.Text = "Claimed" -- Update the button to indicate that this day's reward has been claimed
 				rewardButton.Checkmark.Visible = true
-				--rewardEvent:FireServer()
-				
+				rewardEvent:FireServer()
+
 				task.delay(REWARD_CLAIMED_DELAY, function()
-					if mainFrame.Position == originalPos then 
+					if mainFrame.Position == originalPos then
 						hideMainFrame(false, true)
 					end
-				end)		
-			else 
+				end)
+			else
 				warn("You cannot request a reward for day", rewardDay, "Current streak:", currentStreak)
-			end 
+			end
 		end
 
 		rewardButton.MouseButton1Click:Connect(rewardButtonClicked)
 		rewardButton.Parent = rewardFrame
 	end
-	
 
-	if mainFrame.Position ~= originalPos then 
+	if mainFrame.Position ~= originalPos then
 		showRewardsTween:Play()
 	end
 
-	-- if not rewardsGUI.Enabled then 
-	-- 	rewardsGUI.Enabled = true 
-	-- end 	
+	-- if not rewardsGUI.Enabled then
+	-- 	rewardsGUI.Enabled = true
+	-- end
 end
 
-local function updateUIClientEvent(_currentStreak, _rewardAvailable, _nextRewardReset)
+local function updateUIClientEvent(_currentStreak: number, _rewardAvailable: boolean, _nextRewardReset: number)
 	print("Player data from server:", _currentStreak, "Rewarda available?", _rewardAvailable, _nextRewardReset)
 	currentStreak = _currentStreak
 	rewardAvailable = _rewardAvailable
-	if _nextRewardReset then 
-		nextRewardReset = nextRewardReset 
+	if _nextRewardReset then
+		nextRewardReset = nextRewardReset
 	end
 	initialize()
 end
@@ -288,22 +313,22 @@ end
 hideMainFrame(true, true)
 rewardsGUI.Enabled = true
 
-if IMAGE_COLOR then   
-    for _, imageLabel in ipairs(templateImages:GetChildren()) do  
-        imageLabel.ImageColor3 = IMAGE_COLOR
-    end
+if IMAGE_COLOR then
+	for _, imageLabel in ipairs(templateImages:GetChildren()) do
+		imageLabel.ImageColor3 = IMAGE_COLOR
+	end
 end
 
 if UPDATE_ZINDEX then
-	templateImages["1"].ZIndex = 3 
-	templateImages["2"].ZIndex = 2 
-	templateImages["3"].ZIndex = 1 
-end 
+	templateImages["1"].ZIndex = 3
+	templateImages["2"].ZIndex = 2
+	templateImages["3"].ZIndex = 1
+end
 
-if mainMenu then 
-	-- Ensure the daily rewards don't pop up while the main menu is enabled 
-	repeat 
-		task.wait(5) 
+if mainMenu then
+	-- Ensure the daily rewards don't pop up while the main menu is enabled
+	repeat
+		task.wait(5)
 	until enterGame.Text == "Continue"
 end
 
@@ -317,15 +342,10 @@ script.Parent.Main.CloseButton.MouseButton1Click:Connect(function()
 end)
 
 -- This allows other scripts to easily toggle visibility of the reward frame
-local ignoreAttribute = false
-rewardsGUI:GetAttributeChangedSignal("RewardsVisible"):Connect(function()
-	if rewardsGUI:GetAttribute("RewardsVisible") then 
+rewardsGUI:GetAttributeChangedSignal("RewardsUIToggle"):Connect(function()
+	if mainFrame.Position ~= originalPos then 
 		showRewardsTween:Play()
-		ignoreAttribute = true 
-		rewardsGUI:SetAttribute("RewardsVisible", false) -- Instantly set it to false, so this functionality can be used once again
-		task.wait(0.5)
-		ignoreAttribute = false 
-	elseif not ignoreAttribute and not rewardsGUI:GetAttribute("RewardsVisible") then 
+	else 
 		hideMainFrame(false)
 	end
 end)
@@ -334,14 +354,16 @@ rewardsGUI:GetPropertyChangedSignal("Enabled"):Connect(function()
 	--if dailyRewardsUi.Enabled then initialize() end
 end)
 
--- Request daily reward data from the server. The server will send the data back and the UI will be initialized (requestData.OnClientEvent) 
+-- Request daily reward data from the server. The server will send the data back and the UI will be initialized (requestData.OnClientEvent)
 for i = 0, 5 do
-	if currentStreak ~= nil then break end
+	if currentStreak ~= nil then
+		break
+	end
 	requestData:FireServer()
 	task.wait(1)
-	
-	if i == 5 then 
-		warn("Failed to get daily reward data.") 
+
+	if i == 5 then
+		warn("Failed to get daily reward data.")
 	end
 end
 
