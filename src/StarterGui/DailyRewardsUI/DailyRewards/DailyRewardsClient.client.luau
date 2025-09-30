@@ -200,103 +200,105 @@ end
 -- Initialize the UI, buttons, etc.
 local firstJoin = true -- This flag makes it so the UI is hidden when the player has no reward and first joins the game. If they initialize function is run a 2nd time, the UI will display
 local function initialize()
-	print("Initializing daily rewards UI. First join?", firstJoin, "Reward available?", rewardAvailable)
-	if firstJoin and not rewardAvailable then
-		print("DailyRewardsUI: A reward is not currently available. Daily rewards UI closed.")
-		hideMainFrame(true)
-		--rewardsGUI.Enabled = false
-		firstJoin = false 
-		return
-	end
-	firstJoin = false
-
-	for _, button in ipairs(rewardFrame:GetChildren()) do
-		if button:IsA("TextButton") then
-			button:Destroy()
+	local success, result = pcall(function()
+		print("Initializing daily rewards UI. First join?", firstJoin, "Reward available?", rewardAvailable)
+		for _, button in ipairs(rewardFrame:GetChildren()) do
+			if button:IsA("TextButton") then
+				button:Destroy()
+			end
 		end
-	end
 
-	local countdownDay = nil -- Keep strack of the day on which we'll have a countdown
-	print(
-		"SETTING UP BUTTONS FOR REWARDS:",
-		rewardsDb,
-		"Current reward streak:",
-		currentStreak,
-		"Is a reward available?",
-		rewardAvailable
-	)
+		local countdownDay = nil -- Keep strack of the day on which we'll have a countdown
+		print(
+			"SETTING UP BUTTONS FOR REWARDS:",
+			rewardsDb,
+			"Current reward streak:",
+			currentStreak,
+			"Is a reward available?",
+			rewardAvailable
+		)
 
-	showNextRewardTime(nextRewardHint)
+		showNextRewardTime(nextRewardHint)
 
-	for rewardDay = 1, #rewardsDb do
-		local rewards = rewardsDb[rewardDay]
-		print(" ")
-		print("Setting up reward button for day", rewardDay)
-		print("Day", rewardDay, "reward data:", rewards)
+		for rewardDay = 1, #rewardsDb do
+			local rewards = rewardsDb[rewardDay]
+			print(" ")
+			print("Setting up reward button for day", rewardDay)
+			print("Day", rewardDay, "reward data:", rewards)
 
-		local rewardButton = rewardButtonTemplate:Clone()
-		rewardButton.DayTitle.Text = formatDailyRewardTitleText(rewards) --"Day " .. rewardDay
+			local rewardButton = rewardButtonTemplate:Clone()
+			rewardButton.DayTitle.Text = formatDailyRewardTitleText(rewards) --"Day " .. rewardDay
 
-		local claimText = nil
-		if not currentStreak then -- Do not display a claim text if the currentStreak is missing
-			claimText = "Day " .. rewardDay
-		elseif rewardDay == countdownDay then
-			showNextRewardTime(rewardButton.ClaimText)
-			claimText = ""
-		elseif (rewardDay == #rewardsDb and currentStreak >= rewardDay) or (rewardDay == currentStreak + 1) then -- Reward day index is 3, and our streak is 2, so we can pick up the reward for this day
-			if rewardAvailable then
-				claimText = "Claim"
-				countdownDay = rewardDay + 1
-				print("Setting countdown day to day", countdownDay)
-			else
+			local claimText = nil
+			if not currentStreak then -- Do not display a claim text if the currentStreak is missing
+				claimText = "Day " .. rewardDay
+			elseif rewardDay == countdownDay then
 				showNextRewardTime(rewardButton.ClaimText)
 				claimText = ""
-			end
-		elseif rewardDay <= currentStreak then
-			claimText = "Claimed"
-		else
-			claimText = "Day " .. rewardDay
-		end
-
-		print("Countdown day:", countdownDay)
-		rewardButton.ClaimText.Text = claimText
-		rewardButton.Checkmark.Visible = claimText == "Claimed" -- currentStreak check isn't necessary, but it's here for testing purposes
-		setupButtonImages(rewardButton, rewards)
-		rewardButton.Visible = true
-
-		local function rewardButtonClicked()
-			if not rewardAvailable then
-				warn("You cannot request a reward for day", rewardDay, "A reward is not currently available.")
-				return
-			end
-
-			if rewardDay == currentStreak + 1 then -- If our streak is 0, we are rewarded with day '1' reward
-				rewardClaimedSound:Play()
-				rewardButton.ClaimText.Text = "Claimed" -- Update the button to indicate that this day's reward has been claimed
-				rewardButton.Checkmark.Visible = true
-				rewardEvent:FireServer()
-
-				task.delay(REWARD_CLAIMED_DELAY, function()
-					if mainFrame.Position == originalPos then
-						hideMainFrame(false, true)
-					end
-				end)
+			elseif (rewardDay == #rewardsDb and currentStreak >= rewardDay) or (rewardDay == currentStreak + 1) then -- Reward day index is 3, and our streak is 2, so we can pick up the reward for this day
+				if rewardAvailable then
+					claimText = "Claim"
+					countdownDay = rewardDay + 1
+					print("Setting countdown day to day", countdownDay)
+				else
+					showNextRewardTime(rewardButton.ClaimText)
+					claimText = ""
+				end
+			elseif rewardDay <= currentStreak then
+				claimText = "Claimed"
 			else
-				warn("You cannot request a reward for day", rewardDay, "Current streak:", currentStreak)
+				claimText = "Day " .. rewardDay
 			end
+
+			print("Countdown day:", countdownDay)
+			rewardButton.ClaimText.Text = claimText
+			rewardButton.Checkmark.Visible = claimText == "Claimed" -- currentStreak check isn't necessary, but it's here for testing purposes
+			setupButtonImages(rewardButton, rewards)
+			rewardButton.Visible = true
+
+			local function rewardButtonClicked()
+				if not rewardAvailable then
+					warn("You cannot request a reward for day", rewardDay, "A reward is not currently available.")
+					return
+				end
+
+				if rewardDay == currentStreak + 1 then -- If our streak is 0, we are rewarded with day '1' reward
+					rewardClaimedSound:Play()
+					rewardButton.ClaimText.Text = "Claimed" -- Update the button to indicate that this day's reward has been claimed
+					rewardButton.Checkmark.Visible = true
+					rewardEvent:FireServer()
+
+					task.delay(REWARD_CLAIMED_DELAY, function()
+						if mainFrame.Position == originalPos then
+							hideMainFrame(false, true)
+						end
+					end)
+				else
+					warn("You cannot request a reward for day", rewardDay, "Current streak:", currentStreak)
+				end
+			end
+
+			rewardButton.MouseButton1Click:Connect(rewardButtonClicked)
+			rewardButton.Parent = rewardFrame
 		end
 
-		rewardButton.MouseButton1Click:Connect(rewardButtonClicked)
-		rewardButton.Parent = rewardFrame
+		if ((firstJoin and rewardAvailable) or (not firstJoin)) and mainFrame.Position ~= originalPos then
+			showRewardsTween:Play()
+		else
+			print(
+				"Initializing daily rewards UI - Condition for showing the UI is not met.",
+				"First join?", firstJoin,
+				"Reward available?", rewardAvailable,
+				"Reward frame already visible?", mainFrame.Position ~= originalPos
+			)
+		end
+	end)
+	
+	if not success then 
+		warn("Error while initializing daily rewards UI:", result)
 	end
-
-	if mainFrame.Position ~= originalPos then
-		showRewardsTween:Play()
-	end
-
-	-- if not rewardsGUI.Enabled then
-	-- 	rewardsGUI.Enabled = true
-	-- end
+	
+	firstJoin = false
 end
 
 local function updateUIClientEvent(_currentStreak: number, _rewardAvailable: boolean, _nextRewardReset: number)
@@ -344,7 +346,8 @@ end)
 -- This allows other scripts to easily toggle visibility of the reward frame
 rewardsGUI:GetAttributeChangedSignal("RewardsUIToggle"):Connect(function()
 	if mainFrame.Position ~= originalPos then 
-		showRewardsTween:Play()
+		requestData:FireServer()
+		--showRewardsTween:Play()
 	else 
 		hideMainFrame(false)
 	end
