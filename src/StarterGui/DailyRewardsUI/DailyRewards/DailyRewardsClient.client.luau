@@ -11,7 +11,6 @@ local mainFrame = rewardsGUI.Main
 local rewardFrame = mainFrame.RewardFrame
 local rewardButtonTemplate = script.Parent.RewardButton
 local templateImages = rewardButtonTemplate.Images
-local nextRewardHint = mainFrame.NextRewardsHint
 
 -- Main menu elements, to ensure the daily rewards UI doesn't open while we're in the main menu
 local mainMenu = script.Parent.Parent.Parent:FindFirstChild("MainMenu")
@@ -22,7 +21,7 @@ local enterGame = mainMenuButtons and mainMenuButtons:FindFirstChild("EnterGame"
 -- Events
 local rewardEvents = ReplicatedStorage:WaitForChild("RemoteEvents"):WaitForChild("DailyRewardEvents")
 local rewardEvent = rewardEvents:WaitForChild("DailyRewardEvent")
-local requestData = rewardEvents:WaitForChild("RequestRewardData")
+local requestRewardDataEvent = rewardEvents:WaitForChild("RequestRewardData")
 
 -- Sounds
 local uiSounds = game:GetService("SoundService"):WaitForChild("UI_Sounds")
@@ -43,7 +42,7 @@ local REWARD_CLAIMED_DELAY = 0.7 -- How long will the UI remains visible after a
 local currentStreak = nil
 local currentSeason = nil
 local rewardAvailable = nil
-local nextRewardReset = math.floor(21.3 * 60 * 60)
+local nextRewardReset = -1
 
 local originalPos = mainFrame.Position
 local hiddenPos = originalPos + UDim2.fromScale(0, 2)
@@ -178,14 +177,14 @@ local function showNextRewardTime(claimTextLabel: TextLabel)
 	task.spawn(function()
 		for i = nextRewardReset, 0, -1 do
 			--if not dailyRewardsUi.Enabled then break end
-			claimTextLabel.Text = (claimTextLabel == nextRewardHint and "Rewards Reset In: " or "") .. formatTime(i, true)
+			claimTextLabel.Text = formatTime(i, true)
 
 			if i <= 0 then
 				hideMainFrame(true)
 				
 				-- reinitialize the UI
 				if mainFrame.Position == originalPos then
-					requestData:FireServer()
+					requestRewardDataEvent:FireServer()
 				end
 				
 				--rewardsGUI.Enabled = false
@@ -217,8 +216,6 @@ local function initialize()
 			"Is a reward available?",
 			rewardAvailable
 		)
-
-		showNextRewardTime(nextRewardHint)
 
 		for rewardDay = 1, #rewardsDb do
 			local rewards = rewardsDb[rewardDay]
@@ -306,7 +303,7 @@ local function updateUIClientEvent(_currentStreak: number, _rewardAvailable: boo
 	currentStreak = _currentStreak
 	rewardAvailable = _rewardAvailable
 	if _nextRewardReset then
-		nextRewardReset = nextRewardReset
+		nextRewardReset = _nextRewardReset
 	end
 	initialize()
 end
@@ -335,7 +332,7 @@ if mainMenu then
 end
 
 rewardEvent.OnClientEvent:Connect(updateUIClientEvent)
-requestData.OnClientEvent:Connect(updateUIClientEvent)
+requestRewardDataEvent.OnClientEvent:Connect(updateUIClientEvent)
 
 script.Parent.Main.CloseButton.MouseButton1Click:Connect(function()
 	confirmSound:Play()
@@ -346,7 +343,7 @@ end)
 -- This allows other scripts to easily toggle visibility of the reward frame
 rewardsGUI:GetAttributeChangedSignal("RewardsUIToggle"):Connect(function()
 	if mainFrame.Position ~= originalPos then 
-		requestData:FireServer()
+		requestRewardDataEvent:FireServer()
 		--showRewardsTween:Play()
 	else 
 		hideMainFrame(false)
@@ -362,7 +359,7 @@ for i = 0, 5 do
 	if currentStreak ~= nil then
 		break
 	end
-	requestData:FireServer()
+	requestRewardDataEvent:FireServer()
 	task.wait(1)
 
 	if i == 5 then
